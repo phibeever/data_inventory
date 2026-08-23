@@ -33,12 +33,12 @@ def save_data(data):
     except Exception as e:
         st.error(f"Gagal menyimpan data: {e}")
 
-# MENSYARATKAN STRICT DICTIONARY
+# MENSYARATKAN STRICT DICTIONARY DENGAN KEAMANAN TINGGI
 if "items" not in st.session_state or not isinstance(st.session_state.items, dict):
-    st.session_state.items = load_data()
+    st.session_state["items"] = load_data()
 
 if "scanned_code" not in st.session_state:
-    st.session_state.scanned_code = ""
+    st.session_state["scanned_code"] = ""
 
 st.title("📦 Sistem Inventaris Barang Web")
 st.caption("Aplikasi Web Inventaris - Kompatibel dengan Laptop dan HP")
@@ -57,7 +57,7 @@ with st.expander("📷 **Buka Scanner Barcode / QR Code Kamera**", expanded=Fals
             
             if results:
                 found_code = results[0].text
-                st.session_state.scanned_code = found_code
+                st.session_state["scanned_code"] = found_code
                 st.success(f"✅ Barcode Terdeteksi: **{found_code}**")
             else:
                 st.warning("⚠️ Barcode tidak terdeteksi pada foto. Pastikan posisi barcode jelas dan terang.")
@@ -67,7 +67,7 @@ with st.expander("📷 **Buka Scanner Barcode / QR Code Kamera**", expanded=Fals
 # --- FORM INPUT DATA BARANG ---
 st.subheader("📝 Form Input / Edit Barang")
 
-default_kode = st.session_state.scanned_code
+default_kode = st.session_state.get("scanned_code", "")
 
 col1, col2 = st.columns(2)
 
@@ -79,12 +79,15 @@ with col2:
     stok_input = st.number_input("Jumlah Stok", min_value=0, step=1, value=0)
     harga_input = st.number_input("Harga Barang (Rp)", min_value=0, step=500, value=0)
 
-# Proteksi penanganan variabel items
-if not isinstance(st.session_state.items, dict):
-    st.session_state.items = {}
+# Ambil dictionary items dengan aman
+current_items = st.session_state.get("items", {})
+if not isinstance(current_items, dict):
+    current_items = {}
+    st.session_state["items"] = current_items
 
-if kode_input and kode_input in st.session_state.items:
-    item_exist = st.session_state.items[kode_input]
+# Cek apakah kode barang sudah terdaftar
+if kode_input and kode_input in current_items:
+    item_exist = current_items[kode_input]
     if isinstance(item_exist, dict):
         st.info(f"💡 Kode terdaftar: **{item_exist.get('nama', '')}** | Stok: {item_exist.get('stok', 0)} | Harga: Rp {item_exist.get('harga', 0):,}")
 
@@ -95,25 +98,25 @@ with col_btn1:
         if not kode_input or not nama_input:
             st.error("Kode dan Nama Barang wajib diisi!")
         else:
-            # Pemasok proteksi tipe data sebelum penetapan kunci
-            if not isinstance(st.session_state.items, dict):
-                st.session_state.items = {}
+            if not isinstance(st.session_state.get("items"), dict):
+                st.session_state["items"] = {}
                 
-            st.session_state.items[kode_input] = {
+            st.session_state["items"][kode_input] = {
                 "nama": nama_input,
                 "stok": int(stok_input),
                 "harga": int(harga_input)
             }
-            save_data(st.session_state.items)
+            save_data(st.session_state["items"])
             st.success(f"Barang '{nama_input}' berhasil disimpan!")
             st.rerun()
 
 with col_btn2:
     if st.button("🗑️ Hapus Barang", type="secondary", use_container_width=True):
-        if isinstance(st.session_state.items, dict) and kode_input in st.session_state.items:
-            nama_del = st.session_state.items[kode_input].get("nama", "Barang")
-            del st.session_state.items[kode_input]
-            save_data(st.session_state.items)
+        items_dict = st.session_state.get("items", {})
+        if isinstance(items_dict, dict) and kode_input in items_dict:
+            nama_del = items_dict[kode_input].get("nama", "Barang")
+            del st.session_state["items"][kode_input]
+            save_data(st.session_state["items"])
             st.warning(f"Barang '{nama_del}' berhasil dihapus.")
             st.rerun()
         else:
@@ -124,9 +127,10 @@ st.divider()
 # --- TABEL DATA INVENTARIS ---
 st.subheader("📊 Daftar Stok Barang")
 
-if isinstance(st.session_state.items, dict) and st.session_state.items:
+display_items = st.session_state.get("items", {})
+if isinstance(display_items, dict) and display_items:
     table_data = []
-    for kode, data in st.session_state.items.items():
+    for kode, data in display_items.items():
         if isinstance(data, dict):
             table_data.append({
                 "Kode Barcode": kode,
