@@ -3,6 +3,35 @@ import os
 import streamlit as st
 from PIL import Image
 import zxingcpp
+import io
+import barcode
+from barcode.writer import ImageWriter
+import qrcode
+
+# --- MODUL GENERATOR BARCODE & QR CODE ---
+with st.expander("🖨️ **Generator & Cetak Barcode / QR Code**", expanded=False):
+    col_gen1, col_gen2 = st.columns(2)
+    
+    with col_gen1:
+        kode_cetak = st.text_input("Masukkan Kode untuk Dibuat Barcode", value=st.session_state.get("scanned_code", ""))
+        jenis_kode = st.selectbox("Pilih Jenis Kode", ["Barcode (Code128)", "QR Code"])
+    
+    with col_gen2:
+        if kode_cetak:
+            buffer = io.BytesIO()
+            if jenis_kode == "Barcode (Code128)":
+                try:
+                    code128 = barcode.get('code128', kode_cetak, writer=ImageWriter())
+                    code128.write(buffer)
+                    st.image(buffer, caption=f"Barcode: {kode_cetak}", width=250)
+                    st.download_button("📥 Unduh Gambar Barcode", data=buffer.getvalue(), file_name=f"barcode_{kode_cetak}.png", mime="image/png")
+                except Exception as e:
+                    st.error("Gagal membuat Barcode. Gunakan karakter alfanumerik standar.")
+            else:
+                qr = qrcode.make(kode_cetak)
+                qr.save(buffer, format="PNG")
+                st.image(buffer, caption=f"QR Code: {kode_cetak}", width=200)
+                st.download_button("📥 Unduh Gambar QR Code", data=buffer.getvalue(), file_name=f"qrcode_{kode_cetak}.png", mime="image/png")
 
 FILE_DATABASE = "inventaris_data.json"
 
