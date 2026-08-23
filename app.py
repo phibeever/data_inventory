@@ -1,0 +1,124 @@
+import json
+import os
+import streamlit as st
+from PIL import Image
+import zxingcpp
+
+FILE_DATABASE = "inventaris_data.json"
+
+st.set_page_config(
+    page_title="Inventaris Barang",
+    page_icon="📦",
+    layout="wide"
+)
+
+def load_data():
+    if os.path.exists(FILE_DATABASE):
+        try:
+            with open(FILE_DATABASE, "r") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+    else:
+        return {
+            "8999999001": {"nama": "Kopi Sachet Instant", "stok": 50, "harga": 3000},
+            "BRG1002": {"nama": "Air Mineral 600ml", "stok": 100, "harga": 4000}
+        }
+
+def save_data(data):
+    with open(FILE_DATABASE, "w") as f:
+        json.dump(data, f, indent=4)
+
+if "items" not in st.session_state:
+    st.session_state.items = load_data()
+
+if "scanned_code" not in st.session_state:
+    st.session_state.scanned_code = ""
+
+st.title("📦 Sistem Inventaris Barang Web")
+st.caption("Aplikasi Web Inventaris - Kompatibel dengan Laptop dan HP")
+
+st.divider()
+
+# --- MODUL PEMINDAI BARCODE KAMERA BAWAAN STREAMLIT ---
+with st.expander("📷 **Buka Scanner Barcode / QR Code Kamera**", expanded=False):
+    st.write("Ambil foto barcode barang menggunakan kamera HP / Komputer Anda:")
+    img_file = st.camera_input("Ambil Foto Barcode")
+    
+    if img_file is not None:
+        # Buka gambar foto kamera
+        image = Image.open(img_file)
+        # Baca barcode dari foto menggunakan zxing-cpp
+        results = zxingcpp.read_barcodes(image)
+        
+        if results:
+            found_code = results[0].text
+            st.session_state.scanned_code = found_code
+            st.success(f"✅ Barcode Terdeteksi: **{found_code}**")
+        else:
+            st.warning("⚠️ Barcode tidak terdeteksi pada foto. Pastikan posisi barcode jelas dan terang.")
+
+# --- FORM INPUT DATA BARANG ---
+st.subheader("📝 Form Input / Edit Barang")
+
+default_kode = st.session_state.scanned_code
+
+col1, col2 = st.columns(2)
+
+with col1:
+    kode_input = st.text_input("Kode Barang / Barcode", value=default_kode)
+    nama_input = st.text_input("Nama Barang")
+
+with col2:
+    stok_input = st.number_input("Jumlah Stok", min_value=0, step=1, value=0)
+    harga_input = st.number_input("Harga Barang (Rp)", min_value=0, step=500, value=0)
+
+if kode_input in st.session_state.items:
+    item_exist = st.session_state.items[kode_input]
+    st.info(f"💡 Kode terdaftar: **{item_exist['nama']}** | Stok: {item_exist['stok']} | Harga: Rp {item_exist['harga']:,}")
+
+col_btn1, col_btn2 = st.columns(2)
+
+with col_btn1:
+    if st.button("💾 Simpan / Update Barang", type="primary", use_container_width=True):
+        if not kode_input or not nama_input:
+            st.error("Kode dan Nama Barang wajib diisi!")
+        else:
+            st.session_state.items[kode_input] = {
+                "nama": nama_input,
+                "stok": int(stok_input),
+                "harga": int(harga_input)
+            }
+            save_data(st.session_state.items)
+            st.success(f"Barang '{nama_input}' berhasil disimpan!")
+            st.rerun()
+
+with col_btn2:
+    if st.button("🗑️ Hapus Barang", type="secondary", use_container_width=True):
+        if kode_input in st.session_state.items:
+            nama_del = st.session_state.items[kode_input]["nama"]
+            del st.session_state.items[kode_input]
+            save_data(st.session_state.items)
+            st.warning(f"Barang '{nama_del}' berhasil dihapus.")
+            st.rerun()
+        else:
+            st.error("Kode barang tidak ditemukan di database.")
+
+st.divider()
+
+# --- TABEL DATA INVENTARIS ---
+st.subheader("📊 Daftar Stok Barang")
+
+if st.session_state.items:
+    table_data = []
+    for kode, data in st.session_state.items.items():
+        table_data.append({
+            "Kode Barcode": kode,
+            "Nama Barang": data["nama"],
+            "Stok": data["stok"],
+            "Harga (Rp)": f"Rp {data['harga']:,}"
+        })
+    
+    st.dataframe(table_data, use_container_width=True)
+else:
+    st.info("Belum ada data barang disimpan.")
