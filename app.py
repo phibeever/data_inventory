@@ -17,14 +17,14 @@ def load_data():
         try:
             with open(FILE_DATABASE, "r") as f:
                 data = json.load(f)
-                return data if isinstance(data, dict) else {}
+                if isinstance(data, dict):
+                    return data
         except Exception:
-            return {}
-    else:
-        return {
-            "8999999001": {"nama": "Kopi Sachet Instant", "stok": 50, "harga": 3000},
-            "BRG1002": {"nama": "Air Mineral 600ml", "stok": 100, "harga": 4000}
-        }
+            pass
+    return {
+        "8999999001": {"nama": "Kopi Sachet Instant", "stok": 50, "harga": 3000},
+        "BRG1002": {"nama": "Air Mineral 600ml", "stok": 100, "harga": 4000}
+    }
 
 def save_data(data):
     try:
@@ -33,7 +33,7 @@ def save_data(data):
     except Exception as e:
         st.error(f"Gagal menyimpan data: {e}")
 
-# Pastikan session_state terisi dictionary valid
+# Inisialisasi awal & validasi ketat agar selalu berbentuk dictionary
 if "items" not in st.session_state or not isinstance(st.session_state.items, dict):
     st.session_state.items = load_data()
 
@@ -51,15 +51,18 @@ with st.expander("📷 **Buka Scanner Barcode / QR Code Kamera**", expanded=Fals
     img_file = st.camera_input("Ambil Foto Barcode")
     
     if img_file is not None:
-        image = Image.open(img_file)
-        results = zxingcpp.read_barcodes(image)
-        
-        if results:
-            found_code = results[0].text
-            st.session_state.scanned_code = found_code
-            st.success(f"✅ Barcode Terdeteksi: **{found_code}**")
-        else:
-            st.warning("⚠️ Barcode tidak terdeteksi pada foto. Pastikan posisi barcode jelas dan terang.")
+        try:
+            image = Image.open(img_file)
+            results = zxingcpp.read_barcodes(image)
+            
+            if results:
+                found_code = results[0].text
+                st.session_state.scanned_code = found_code
+                st.success(f"✅ Barcode Terdeteksi: **{found_code}**")
+            else:
+                st.warning("⚠️ Barcode tidak terdeteksi pada foto. Pastikan posisi barcode jelas dan terang.")
+        except Exception as e:
+            st.error(f"Gagal memproses gambar: {e}")
 
 # --- FORM INPUT DATA BARANG ---
 st.subheader("📝 Form Input / Edit Barang")
@@ -77,8 +80,10 @@ with col2:
     harga_input = st.number_input("Harga Barang (Rp)", min_value=0, step=500, value=0)
 
 # Cek keberadaan kode secara aman
-if kode_input and kode_input in st.session_state.items:
-    item_exist = st.session_state.items[kode_input]
+items_dict = st.session_state.items if isinstance(st.session_state.items, dict) else {}
+
+if kode_input and kode_input in items_dict:
+    item_exist = items_dict[kode_input]
     st.info(f"💡 Kode terdaftar: **{item_exist['nama']}** | Stok: {item_exist['stok']} | Harga: Rp {item_exist['harga']:,}")
 
 col_btn1, col_btn2 = st.columns(2)
@@ -88,6 +93,9 @@ with col_btn1:
         if not kode_input or not nama_input:
             st.error("Kode dan Nama Barang wajib diisi!")
         else:
+            if not isinstance(st.session_state.items, dict):
+                st.session_state.items = {}
+                
             st.session_state.items[kode_input] = {
                 "nama": nama_input,
                 "stok": int(stok_input),
@@ -99,7 +107,7 @@ with col_btn1:
 
 with col_btn2:
     if st.button("🗑️ Hapus Barang", type="secondary", use_container_width=True):
-        if kode_input in st.session_state.items:
+        if isinstance(st.session_state.items, dict) and kode_input in st.session_state.items:
             nama_del = st.session_state.items[kode_input]["nama"]
             del st.session_state.items[kode_input]
             save_data(st.session_state.items)
@@ -113,15 +121,19 @@ st.divider()
 # --- TABEL DATA INVENTARIS ---
 st.subheader("📊 Daftar Stok Barang")
 
-if st.session_state.items:
+# Pengamanan ekstra saat me-looping data tabel
+current_items = st.session_state.items if isinstance(st.session_state.items, dict) else {}
+
+if current_items:
     table_data = []
-    for kode, data in st.session_state.items.items():
-        table_data.append({
-            "Kode Barcode": kode,
-            "Nama Barang": data["nama"],
-            "Stok": data["stok"],
-            "Harga (Rp)": f"Rp {data['harga']:,}"
-        })
+    for kode, data in current_items.items():
+        if isinstance(data, dict):
+            table_data.append({
+                "Kode Barcode": kode,
+                "Nama Barang": data.get("nama", "-"),
+                "Stok": data.get("stok", 0),
+                "Harga (Rp)": f"Rp {data.get('harga', 0):,}"
+            })
     
     st.dataframe(table_data, use_container_width=True)
 else:
