@@ -16,8 +16,9 @@ def load_data():
     if os.path.exists(FILE_DATABASE):
         try:
             with open(FILE_DATABASE, "r") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
+                data = json.load(f)
+                return data if isinstance(data, dict) else {}
+        except Exception:
             return {}
     else:
         return {
@@ -26,10 +27,14 @@ def load_data():
         }
 
 def save_data(data):
-    with open(FILE_DATABASE, "w") as f:
-        json.dump(data, f, indent=4)
+    try:
+        with open(FILE_DATABASE, "w") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        st.error(f"Gagal menyimpan data: {e}")
 
-if "items" not in st.session_state:
+# Pastikan session_state terisi dictionary valid
+if "items" not in st.session_state or not isinstance(st.session_state.items, dict):
     st.session_state.items = load_data()
 
 if "scanned_code" not in st.session_state:
@@ -40,15 +45,13 @@ st.caption("Aplikasi Web Inventaris - Kompatibel dengan Laptop dan HP")
 
 st.divider()
 
-# --- MODUL PEMINDAI BARCODE KAMERA BAWAAN STREAMLIT ---
+# --- MODUL PEMINDAI BARCODE KAMERA ---
 with st.expander("📷 **Buka Scanner Barcode / QR Code Kamera**", expanded=False):
     st.write("Ambil foto barcode barang menggunakan kamera HP / Komputer Anda:")
     img_file = st.camera_input("Ambil Foto Barcode")
     
     if img_file is not None:
-        # Buka gambar foto kamera
         image = Image.open(img_file)
-        # Baca barcode dari foto menggunakan zxing-cpp
         results = zxingcpp.read_barcodes(image)
         
         if results:
@@ -73,7 +76,8 @@ with col2:
     stok_input = st.number_input("Jumlah Stok", min_value=0, step=1, value=0)
     harga_input = st.number_input("Harga Barang (Rp)", min_value=0, step=500, value=0)
 
-if kode_input in st.session_state.items:
+# Cek keberadaan kode secara aman
+if kode_input and kode_input in st.session_state.items:
     item_exist = st.session_state.items[kode_input]
     st.info(f"💡 Kode terdaftar: **{item_exist['nama']}** | Stok: {item_exist['stok']} | Harga: Rp {item_exist['harga']:,}")
 
