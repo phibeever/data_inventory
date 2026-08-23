@@ -33,7 +33,7 @@ def save_data(data):
     except Exception as e:
         st.error(f"Gagal menyimpan data: {e}")
 
-# Inisialisasi awal & validasi ketat agar selalu berbentuk dictionary
+# MENSYARATKAN STRICT DICTIONARY
 if "items" not in st.session_state or not isinstance(st.session_state.items, dict):
     st.session_state.items = load_data()
 
@@ -79,12 +79,14 @@ with col2:
     stok_input = st.number_input("Jumlah Stok", min_value=0, step=1, value=0)
     harga_input = st.number_input("Harga Barang (Rp)", min_value=0, step=500, value=0)
 
-# Cek keberadaan kode secara aman
-items_dict = st.session_state.items if isinstance(st.session_state.items, dict) else {}
+# Proteksi penanganan variabel items
+if not isinstance(st.session_state.items, dict):
+    st.session_state.items = {}
 
-if kode_input and kode_input in items_dict:
-    item_exist = items_dict[kode_input]
-    st.info(f"💡 Kode terdaftar: **{item_exist['nama']}** | Stok: {item_exist['stok']} | Harga: Rp {item_exist['harga']:,}")
+if kode_input and kode_input in st.session_state.items:
+    item_exist = st.session_state.items[kode_input]
+    if isinstance(item_exist, dict):
+        st.info(f"💡 Kode terdaftar: **{item_exist.get('nama', '')}** | Stok: {item_exist.get('stok', 0)} | Harga: Rp {item_exist.get('harga', 0):,}")
 
 col_btn1, col_btn2 = st.columns(2)
 
@@ -93,6 +95,7 @@ with col_btn1:
         if not kode_input or not nama_input:
             st.error("Kode dan Nama Barang wajib diisi!")
         else:
+            # Pemasok proteksi tipe data sebelum penetapan kunci
             if not isinstance(st.session_state.items, dict):
                 st.session_state.items = {}
                 
@@ -108,7 +111,7 @@ with col_btn1:
 with col_btn2:
     if st.button("🗑️ Hapus Barang", type="secondary", use_container_width=True):
         if isinstance(st.session_state.items, dict) and kode_input in st.session_state.items:
-            nama_del = st.session_state.items[kode_input]["nama"]
+            nama_del = st.session_state.items[kode_input].get("nama", "Barang")
             del st.session_state.items[kode_input]
             save_data(st.session_state.items)
             st.warning(f"Barang '{nama_del}' berhasil dihapus.")
@@ -121,12 +124,9 @@ st.divider()
 # --- TABEL DATA INVENTARIS ---
 st.subheader("📊 Daftar Stok Barang")
 
-# Pengamanan ekstra saat me-looping data tabel
-current_items = st.session_state.items if isinstance(st.session_state.items, dict) else {}
-
-if current_items:
+if isinstance(st.session_state.items, dict) and st.session_state.items:
     table_data = []
-    for kode, data in current_items.items():
+    for kode, data in st.session_state.items.items():
         if isinstance(data, dict):
             table_data.append({
                 "Kode Barcode": kode,
